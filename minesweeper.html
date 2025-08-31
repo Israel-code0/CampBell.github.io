@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minesweeper Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #1e3c72;
+      color: white;
+      margin: 0;
+      padding: 10px;
+    }
+    h1 { margin: 10px; }
+    #levelSelector { margin: 10px; }
+    #board {
+      display: grid;
+      justify-content: center;
+      margin: 20px auto;
+      gap: 2px;
+    }
+    .cell {
+      width: 30px;
+      height: 30px;
+      background: #2a5298;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      border-radius: 4px;
+      user-select: none;
+      cursor: pointer;
+    }
+    .cell.revealed { background: #b0bec5; color: black; cursor: default; }
+    .cell.mine { background: red; color: white; }
+    button, select {
+      padding: 10px 15px;
+      font-size: 16px;
+      margin: 5px;
+      border: none;
+      border-radius: 6px;
+      background: #0f2027;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover, select:hover { background: #2a5298; }
+    #homeBtn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #ff9800;
+      font-size: 14px;
+    }
+    #homeBtn:hover { background: #e68900; }
+  </style>
+</head>
+<body>
+  <!-- Go Back Home Button -->
+  <button id="homeBtn" onclick="goHome()">🏠 Home</button>
+
+  <h1>💣 Minesweeper</h1>
+
+  <!-- Level Selector -->
+  <div id="levelSelector">
+    <label for="level">Choose Level: </label>
+    <select id="level" onchange="startGame(this.value)">
+      <option value="beginner">Beginner (8x8, 10 mines)</option>
+      <option value="intermediate" selected>Intermediate (12x12, 20 mines)</option>
+      <option value="expert">Expert (16x16, 40 mines)</option>
+    </select>
+  </div>
+
+  <div id="board"></div>
+
+  <script>
+    let rows, cols, mines, board = [], mineCount;
+
+    function goHome() {
+      window.location.href = "index.html"; // Go back to main game hub
+    }
+
+    function startGame(level) {
+      if (level === "beginner") { rows = 8; cols = 8; mines = 10; }
+      else if (level === "intermediate") { rows = 12; cols = 12; mines = 20; }
+      else { rows = 16; cols = 16; mines = 40; }
+
+      mineCount = mines;
+      board = [];
+      const boardElement = document.getElementById("board");
+      boardElement.innerHTML = "";
+      boardElement.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+
+      // Initialize Board
+      for (let r = 0; r < rows; r++) {
+        board[r] = [];
+        for (let c = 0; c < cols; c++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+
+          // Left click
+          cell.addEventListener("click", revealCell);
+
+          // Right click (flag)
+          cell.addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+            toggleFlag(r, c);
+          });
+
+          // Long press on mobile (flag)
+          let pressTimer;
+          cell.addEventListener("touchstart", function(e) {
+            pressTimer = setTimeout(() => {
+              toggleFlag(r, c);
+            }, 600);
+          });
+          cell.addEventListener("touchend", function(e) {
+            clearTimeout(pressTimer);
+          });
+
+          boardElement.appendChild(cell);
+          board[r][c] = { mine: false, revealed: false, flagged: false, element: cell, count: 0 };
+        }
+      }
+
+      // Place Mines
+      let placed = 0;
+      while (placed < mines) {
+        let r = Math.floor(Math.random() * rows);
+        let c = Math.floor(Math.random() * cols);
+        if (!board[r][c].mine) {
+          board[r][c].mine = true;
+          placed++;
+        }
+      }
+
+      // Calculate numbers
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (board[r][c].mine) continue;
+          let count = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              let nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr][nc].mine) {
+                count++;
+              }
+            }
+          }
+          board[r][c].count = count;
+        }
+      }
+    }
+
+    function toggleFlag(r, c) {
+      let cell = board[r][c];
+      if (cell.revealed) return;
+
+      cell.flagged = !cell.flagged;
+      cell.element.textContent = cell.flagged ? "🚩" : "";
+    }
+
+    function revealCell(e) {
+      let r = parseInt(this.dataset.row);
+      let c = parseInt(this.dataset.col);
+      let cell = board[r][c];
+
+      if (cell.revealed || cell.flagged) return;
+
+      cell.revealed = true;
+      cell.element.classList.add("revealed");
+
+      if (cell.mine) {
+        cell.element.classList.add("mine");
+        cell.element.textContent = "💣";
+        alert("💥 Game Over!");
+        startGame(document.getElementById("level").value);
+        return;
+      }
+
+      if (cell.count > 0) {
+        cell.element.textContent = cell.count;
+      } else {
+        // Auto reveal neighbors
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            let nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+              revealCell.call(board[nr][nc].element);
+            }
+          }
+        }
+      }
+    }
+
+    // Start with Intermediate
+    startGame("intermediate");
+  </script>
+</body>
+</html>

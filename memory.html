@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #2193b0, #6dd5ed);
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: white;
+    }
+    h1 {
+      margin: 10px 0;
+    }
+    .controls {
+      margin-bottom: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #ff9800;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: #e68900;
+    }
+    #gameBoard {
+      display: grid;
+      gap: 10px;
+      justify-content: center;
+    }
+    .card {
+      width: 70px;
+      height: 70px;
+      background: #333;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      cursor: pointer;
+      color: transparent;
+      transition: background 0.3s, color 0.3s;
+    }
+    .card.flipped {
+      background: white;
+      color: black;
+    }
+    @media (max-width: 768px) {
+      .card {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Memory Game</h1>
+
+  <!-- Level Selector -->
+  <div class="controls">
+    <button onclick="startGame('easy')">Easy</button>
+    <button onclick="startGame('medium')">Medium</button>
+    <button onclick="startGame('hard')">Hard</button>
+    <button onclick="window.location.href='index.html'">🏠 Home</button>
+  </div>
+
+  <div id="gameBoard"></div>
+
+  <script>
+    const board = document.getElementById("gameBoard");
+    let firstCard = null;
+    let lockBoard = false;
+    let matchedPairs = 0;
+    let totalPairs = 0;
+
+    function startGame(level) {
+      board.innerHTML = "";
+      firstCard = null;
+      lockBoard = false;
+      matchedPairs = 0;
+
+      let emojis = ["🍎","🍌","🍇","🍉","🍓","🍒","🥝","🍍","🥥","🍑","🥭","🍈"];
+
+      if (level === "easy") {
+        emojis = emojis.slice(0, 4); // 4 pairs = 8 cards
+        board.style.gridTemplateColumns = "repeat(4, 1fr)";
+      } else if (level === "medium") {
+        emojis = emojis.slice(0, 6); // 6 pairs = 12 cards
+        board.style.gridTemplateColumns = "repeat(4, 1fr)";
+      } else if (level === "hard") {
+        emojis = emojis.slice(0, 8); // 8 pairs = 16 cards
+        board.style.gridTemplateColumns = "repeat(4, 1fr)";
+      }
+
+      totalPairs = emojis.length;
+
+      // duplicate emojis & shuffle
+      let gameCards = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
+
+      gameCards.forEach(symbol => {
+        const card = document.createElement("div");
+        card.classList.add("card");
+        card.textContent = symbol;
+
+        card.addEventListener("click", () => flipCard(card));
+        board.appendChild(card);
+      });
+    }
+
+    function flipCard(card) {
+      if (lockBoard || card.classList.contains("flipped")) return;
+
+      card.classList.add("flipped");
+
+      if (!firstCard) {
+        firstCard = card;
+      } else {
+        if (firstCard.textContent === card.textContent) {
+          firstCard = null;
+          matchedPairs++;
+          if (matchedPairs === totalPairs) {
+            setTimeout(() => alert("🎉 You won!"), 300);
+          }
+        } else {
+          lockBoard = true;
+          setTimeout(() => {
+            firstCard.classList.remove("flipped");
+            card.classList.remove("flipped");
+            firstCard = null;
+            lockBoard = false;
+          }, 800);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

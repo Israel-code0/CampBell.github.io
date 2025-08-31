@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #0f2027;
+      color: white;
+      margin: 0;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 5px;
+      margin: 20px auto;
+      width: max-content;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      font-size: 2.5em;
+      background: #1c1c1c;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: cyan;
+      transition: background 0.3s;
+    }
+    .cell:hover {
+      background: #2a5298;
+    }
+    #status {
+      margin: 15px;
+      font-size: 20px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2a5298;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e3c72;
+    }
+     button:hover, select:hover { background: #2a5298; }
+    #homeBtn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #ff9800;
+      font-size: 14px;
+    }
+    #homeBtn:hover { background: #e68900; }
+  </style>
+</head>
+<body>
+  <h1>❌⭕ Tic Tac Toe</h1>
+  <div>
+    <label for="mode">Mode:</label>
+    <select id="mode">
+      <option value="2p">2 Players</option>
+      <option value="1p">1 Player (vs Computer)</option>
+    </select>
+
+    <label for="level">Level:</label>
+    <select id="level">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+  </div>
+
+  <div id="board"></div>
+  <p id="status">Player X's turn</p>
+  <button onclick="resetGame()">Restart</button>
+  <button onclick="window.location.href='index.html'">🏠 Go Back Home</button>
+
+  <script>
+     function goHome() {
+      window.location.href = "index.html"; // Go back to main game hub
+    }
+
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+    const modeEl = document.getElementById("mode");
+    const levelEl = document.getElementById("level");
+
+    let board, currentPlayer, gameOver;
+
+    function init() {
+      board = Array(9).fill("");
+      currentPlayer = "X";
+      gameOver = false;
+      renderBoard();
+      statusEl.textContent = "Player X's turn";
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      board.forEach((val, i) => {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.textContent = val;
+        cell.onclick = () => handleMove(i);
+        boardEl.appendChild(cell);
+      });
+    }
+
+    function handleMove(i) {
+      if (board[i] || gameOver) return;
+      board[i] = currentPlayer;
+      renderBoard();
+
+      if (checkWin(currentPlayer)) {
+        statusEl.textContent = `Player ${currentPlayer} wins!`;
+        gameOver = true;
+        return;
+      }
+
+      if (board.every(c => c)) {
+        statusEl.textContent = "It's a Draw!";
+        gameOver = true;
+        return;
+      }
+
+      if (modeEl.value === "2p") {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        statusEl.textContent = `Player ${currentPlayer}'s turn`;
+      } else {
+        currentPlayer = "O"; // Computer
+        computerMove();
+      }
+    }
+
+    function computerMove() {
+      if (gameOver) return;
+      let move;
+
+      if (levelEl.value === "easy") {
+        // Random move
+        const empty = board.map((c, i) => c === "" ? i : null).filter(v => v !== null);
+        move = empty[Math.floor(Math.random() * empty.length)];
+      } else if (levelEl.value === "medium") {
+        // Block or random
+        move = findWinningMove("O") || findWinningMove("X");
+        if (move === null) {
+          const empty = board.map((c, i) => c === "" ? i : null).filter(v => v !== null);
+          move = empty[Math.floor(Math.random() * empty.length)];
+        }
+      } else {
+        // Hard: Try winning, else block, else random
+        move = findWinningMove("O") || findWinningMove("X");
+        if (move === null) {
+          const empty = board.map((c, i) => c === "" ? i : null).filter(v => v !== null);
+          move = empty[Math.floor(Math.random() * empty.length)];
+        }
+      }
+
+      if (move !== null) {
+        board[move] = "O";
+        renderBoard();
+      }
+
+      if (checkWin("O")) {
+        statusEl.textContent = "Computer wins!";
+        gameOver = true;
+        return;
+      }
+
+      if (board.every(c => c)) {
+        statusEl.textContent = "It's a Draw!";
+        gameOver = true;
+        return;
+      }
+
+      currentPlayer = "X";
+      statusEl.textContent = "Player X's turn";
+    }
+
+    function findWinningMove(player) {
+      const winPatterns = [
+        [0,1,2],[3,4,5],[6,7,8], // rows
+        [0,3,6],[1,4,7],[2,5,8], // cols
+        [0,4,8],[2,4,6]          // diags
+      ];
+      for (let pattern of winPatterns) {
+        const [a,b,c] = pattern;
+        if (board[a] === player && board[b] === player && board[c] === "") return c;
+        if (board[a] === player && board[c] === player && board[b] === "") return b;
+        if (board[b] === player && board[c] === player && board[a] === "") return a;
+      }
+      return null;
+    }
+
+    function checkWin(player) {
+      const winPatterns = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      return winPatterns.some(p => p.every(i => board[i] === player));
+    }
+
+    function resetGame() {
+      init();
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampBell Games</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: rgba(0,0,0,0.7);
+      padding: 20px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2.5em;
+    }
+    .games {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 30px;
+    }
+    .game-card {
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .game-card:hover {
+      transform: scale(1.05);
+    }
+    .game-card h2 {
+      margin: 10px 0;
+    }
+    .game-card a {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px 15px;
+      background: #2a5298;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+    }
+    .game-card a:hover {
+      background: #1e3c72;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎮 CampBell Games</h1>
+    <p>Choose a game to play</p>
+  </header>
+
+  <main>
+    <div class="games">
+      <div class="game-card">
+        <h2>🐍 Snake</h2>
+        <p>Classic snake game with levels.</p>
+        <a href="snake.html">Play</a>
+      </div>
+
+
+      <div class="game-card">
+        <h2>💣 Minesweeper</h2>
+        <p>Find all the safe cells without hitting bombs.</p>
+        <a href="minesweeper.html">Play</a>
+      </div>
+
+      <div class="game-card">
+        <h2>🧠 Memory</h2>
+        <p>Flip cards and test your memory skills.</p>
+        <a href="memory.html">Play</a>
+      </div>
+      <div class="game-card">
+        <h2>❌⭕ Tic Tac Toe</h2>
+        <p>Take turns marking the spaces in a 3×3 grid.</p>
+        <a href="tictactoe.html">Play</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

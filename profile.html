@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Profile — GamePortal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="brand">Campbell's GamePortal</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="games.html">Games</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </nav>
+  </header>
+
+  <main class="profile-page">
+    <div class="profile-box">
+      <h2>Your Profile</h2>
+      <div class="profile-card">
+        <img id="avatarPreview" src="assets/default-avatar.png" alt="avatar" class="avatar">
+        <div>
+          <p><strong id="displayName">Guest</strong></p>
+          <p id="usernameTag"></p>
+        </div>
+      </div>
+
+      <label class="file-label">Upload avatar
+        <input id="avatarUpload" type="file" accept="image/*" onchange="uploadAvatar(event)">
+      </label>
+
+      <div class="danger">
+        <button onclick="deleteAccount()">Delete account</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      window.renderProfile();
+    });
+  </script>
+</body>
+</html>

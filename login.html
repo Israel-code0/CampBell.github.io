@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Login — GamePortal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="brand">GamePortal</h1>
+    <nav><a href="index.html">Home</a></nav>
+  </header>
+
+  <main class="auth-container">
+    <div class="auth-box">
+      <h2>Login</h2>
+      <form onsubmit="login(event)">
+        <input id="loginUsername" autocomplete="username" required placeholder="Username">
+        <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Password">
+        <button type="submit">Login</button>
+      </form>
+      <p>New? <a href="register.html">Register here</a></p>
+    </div>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

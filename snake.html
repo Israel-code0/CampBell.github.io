@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #43cea2, #185a9d);
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+    h1 {
+      margin: 10px 0;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #ff9800;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: #e68900;
+    }
+    canvas {
+      background: #111;
+      border: 2px solid white;
+      border-radius: 10px;
+    }
+    .controls {
+  position: fixed;
+  bottom: 20px;
+  left: 20px; /* instead of center, fix it to the left */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+  .controls .row {
+    display: flex;
+    gap: 8px;
+  }
+  .controls button {
+    width: 80px;
+    height: 60px;
+    font-size: 18px;
+    border: none;
+    border-radius: 12px;
+    background: #2a5298;
+    color: white;
+    cursor: pointer;
+  }
+  .controls button:active {
+    background: #1e3c72;
+  }
+    
+  </style>
+</head>
+<body>
+  <h1>🐍 Snake Game</h1>
+
+  <div class="">
+    <button onclick="startGame('easy')">Easy</button>
+    <button onclick="startGame('medium')">Medium</button>
+    <button onclick="startGame('hard')">Hard</button>
+    <button onclick="restartGame()">🔄 Restart</button>
+    <button onclick="window.location.href='index.html'">🏠 Home</button>
+  </div>
+  <div class="controls">
+  <div class="row">
+    <button onclick="changeDirection('UP')">⬆️ Up</button>
+  </div>
+  <div class="row">
+    <button onclick="changeDirection('LEFT')">⬅️ Left</button>
+    <button onclick="changeDirection('DOWN')">⬇️ Down</button>
+    <button onclick="changeDirection('RIGHT')">➡️ Right</button>
+  </div>
+</div>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let box = 20;
+    let snake, food, dx, dy, score, speed, gameInterval;
+
+    function startGame(level) {
+      snake = [{ x: 9 * box, y: 9 * box }];
+      food = {
+        x: Math.floor(Math.random() * (canvas.width / box)) * box,
+        y: Math.floor(Math.random() * (canvas.height / box)) * box
+      };
+      dx = box;
+      dy = 0;
+      score = 0;
+
+      if (level === "easy") speed = 200;
+      if (level === "medium") speed = 120;
+      if (level === "hard") speed = 80;
+
+      if (gameInterval) clearInterval(gameInterval);
+      gameInterval = setInterval(draw, speed);
+    }
+
+    function restartGame() {
+      if (speed) {
+        startGame(speed === 200 ? "easy" : speed === 120 ? "medium" : "hard");
+      }
+    }
+
+    document.addEventListener("keydown", direction);
+
+    function direction(event) {
+      if (event.key === "ArrowLeft" && dx === 0) {
+        dx = -box; dy = 0;
+      } else if (event.key === "ArrowUp" && dy === 0) {
+        dx = 0; dy = -box;
+      } else if (event.key === "ArrowRight" && dx === 0) {
+        dx = box; dy = 0;
+      } else if (event.key === "ArrowDown" && dy === 0) {
+        dx = 0; dy = box;
+      }
+    }
+
+    // mobile swipe controls
+    let touchStartX = 0, touchStartY = 0;
+    canvas.addEventListener("touchstart", e => {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    });
+    canvas.addEventListener("touchend", e => {
+      const touch = e.changedTouches[0];
+      let dxTouch = touch.clientX - touchStartX;
+      let dyTouch = touch.clientY - touchStartY;
+
+      if (Math.abs(dxTouch) > Math.abs(dyTouch)) {
+        if (dxTouch > 0 && dx === 0) { dx = box; dy = 0; }
+        else if (dxTouch < 0 && dx === 0) { dx = -box; dy = 0; }
+      } else {
+        if (dyTouch > 0 && dy === 0) { dx = 0; dy = box; }
+        else if (dyTouch < 0 && dy === 0) { dx = 0; dy = -box; }
+      }
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // draw snake
+      for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? "lime" : "white";
+        ctx.fillRect(snake[i].x, snake[i].y, box, box);
+      }
+
+      // draw food
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x, food.y, box, box);
+
+      // move snake
+      let headX = snake[0].x + dx;
+      let headY = snake[0].y + dy;
+
+      // eat food
+      if (headX === food.x && headY === food.y) {
+        food = {
+          x: Math.floor(Math.random() * (canvas.width / box)) * box,
+          y: Math.floor(Math.random() * (canvas.height / box)) * box
+        };
+        score++;
+      } else {
+        snake.pop();
+      }
+
+      let newHead = { x: headX, y: headY };
+
+      // game over conditions
+      if (
+        headX < 0 || headY < 0 ||
+        headX >= canvas.width || headY >= canvas.height ||
+        snake.some(part => part.x === newHead.x && part.y === newHead.y)
+      ) {
+        clearInterval(gameInterval);
+        alert("💀 Game Over! Score: " + score);
+        return;
+      }
+
+      snake.unshift(newHead);
+    }
+    function changeDirection(dir) {
+  if (dir === 'LEFT' && dx === 0) {
+    dx = -box; dy = 0;
+  } else if (dir === 'UP' && dy === 0) {
+    dx = 0; dy = -box;
+  } else if (dir === 'RIGHT' && dx === 0) {
+    dx = box; dy = 0;
+  } else if (dir === 'DOWN' && dy === 0) {
+    dx = 0; dy = box;
+  }
+}
+
+  </script>
+</body>
+</html>
