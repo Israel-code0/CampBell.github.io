@@ -1,413 +1,258 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Sugar Smash — Swipe Match-3</title>
-<style>
-  :root{
-    --bg1:#0f2027; --bg2:#2a5298;
-    --panel:#0f2732; --accent:#ffcc00;
-    --cell:54px;
-  }
-  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:linear-gradient(135deg,var(--bg1),var(--bg2)); color:#fff}
-  .wrap{max-width:980px;margin:18px auto;padding:14px}
-  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  h1{font-size:20px;margin:0}
-  .controls{display:flex;gap:8px;align-items:center}
-  select,button{background:rgba(255,255,255,0.04);border:0;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
-  .hud{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
-  .badge{background:rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px}
-  main{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;align-items:flex-start}
-  .board-wrap{background:rgba(255,255,255,0.02);padding:12px;border-radius:12px}
-  #board{display:grid;grid-gap:6px;touch-action: none}
-  .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;background:#111;font-size:26px;user-select:none; -webkit-user-select:none; transition:transform .12s,opacity .12s}
-  .cell.selected{outline:3px solid rgba(255,255,255,0.12); transform:scale(1.05)}
-  .cell.remove{opacity:0; transform:scale(.8)}
-  .sidebar{min-width:220px;padding:12px;background:rgba(255,255,255,0.02);border-radius:12px}
-  .big{font-size:26px;color:var(--accent);font-weight:700}
-  .small{font-size:13px;opacity:.9}
-  #modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:60}
-  #modal .card{background:#132025;padding:20px;border-radius:12px;text-align:center}
-  #modal button{margin-top:12px}
-  @media (max-width:720px){:root{--cell:44px};main{flex-direction:column}.sidebar{width:100%}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #0f2027;
+      color: white;
+      margin: 0;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 5px;
+      margin: 20px auto;
+      width: max-content;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      font-size: 2.5em;
+      background: #1c1c1c;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: cyan;
+      transition: background 0.3s;
+    }
+    .cell:hover {
+      background: #2a5298;
+    }
+    #status {
+      margin: 15px;
+      font-size: 20px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2a5298;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e3c72;
+    }
+    #homeBtn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #ff9800;
+      font-size: 14px;
+    }
+    #homeBtn:hover { background: #e68900; }
+
+    /* Popup Modal */
+    #popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #popupContent {
+      background: #1c1c1c;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 0 15px #000;
+      font-size: 22px;
+    }
+    #popup button {
+      background: #2a5298;
+      margin-top: 15px;
+    }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Sugar Smash — Swipe Match-3</h1>
-    <div class="controls">
-      <select id="level">
-        <option value="easy" data-target="1200" data-moves="40">Easy (1200 - 40 moves)</option>
-        <option value="medium" data-target="2400" data-moves="30" selected>Medium (2400 - 30 moves)</option>
-        <option value="hard" data-target="4000" data-moves="22">Hard (4000 - 22 moves)</option>
-      </select>
-      <button id="restart">Restart</button>
-      <button onclick="location.href='index.html'">🏠 Home</button>
-    </div>
-  </header>
+  <h1>❌⭕ Tic Tac Toe</h1>
+  <div>
+    <label for="mode">Mode:</label>
+    <select id="mode">
+      <option value="2p">2 Players</option>
+      <option value="1p">1 Player (vs Computer)</option>
+    </select>
 
-  <div class="hud">
-    <div class="badge">Score: <strong id="score">0</strong></div>
-    <div class="badge">Moves: <strong id="moves">30</strong></div>
-    <div class="badge small">Target: <strong id="target">2400</strong></div>
+    <label for="level">Level:</label>
+    <select id="level">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
   </div>
 
-  <main>
-    <div class="board-wrap">
-      <div id="board" role="grid" aria-label="Match 3 board"></div>
-    </div>
+  <div id="board"></div>
+  <p id="status">Player X's turn</p>
+  <button onclick="resetGame()">Restart</button>
+  <button onclick="window.location.href='index.html'">🏠</button>
 
-    <aside class="sidebar">
-      <div class="big" id="levelLabel">Medium</div>
-      <p class="small">Tap a candy then swipe or tap an adjacent candy to swap. Make lines of 3+ to clear them. Candies fall and refill. Match bigger chains and combos for extra points.</p>
-      <hr style="opacity:.06;border:none;height:8px">
-      <div class="small"><strong>Scoring</strong>: 3 = 100pts, +50 per extra candy in same match. Combo cascades add bonus.</div>
-    </aside>
-  </main>
-</div>
-
-<!-- Modal -->
-<div id="modal" aria-hidden="true">
-  <div class="card">
-    <div id="modalMessage" style="font-size:18px;margin-bottom:8px"></div>
-    <div style="display:flex;gap:8px;justify-content:center">
-      <button id="playAgain">Play Again</button>
-      <button id="modalHome">Home</button>
+  <!-- Popup Modal -->
+  <div id="popup">
+    <div id="popupContent">
+      <p id="popupMessage"></p>
+      <button onclick="closePopup()">OK</button>
     </div>
   </div>
-</div>
 
-<script>
-/* Swipeable Match-3: full implementation */
-const GRID = 8;
-const candies = ['🍒','🍋','🍊','🍏','🍇','🍬','🍭','🍩']; // emoji set
-const boardEl = document.getElementById('board');
-const scoreEl = document.getElementById('score');
-const movesEl = document.getElementById('moves');
-const targetEl = document.getElementById('target');
-const levelSelect = document.getElementById('level');
-const restartBtn = document.getElementById('restart');
-const levelLabel = document.getElementById('levelLabel');
+  <script>
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+    const modeEl = document.getElementById("mode");
+    const levelEl = document.getElementById("level");
+    const popup = document.getElementById("popup");
+    const popupMessage = document.getElementById("popupMessage");
 
-let grid = []; // {candy,el}
-let selected = null;
-let score = 0;
-let movesLeft = 30;
-let targetScore = 2400;
-let busy = false;
+    let board, currentPlayer, gameOver;
 
-// touch/mouse swipe capture
-let touchStart = null; // {r,c,x,y}
-const SWIPE_MIN = 18;
-
-function initLevelFromSelect(){
-  const opt = levelSelect.selectedOptions[0];
-  targetScore = Number(opt.dataset.target);
-  movesLeft = Number(opt.dataset.moves);
-  levelLabel.textContent = opt.text.split('(')[0].trim();
-  score = 0;
-  updateHUD();
-}
-function updateHUD(){ scoreEl.textContent = score; movesEl.textContent = movesLeft; targetEl.textContent = targetScore; }
-
-function makeBoard(){
-  boardEl.style.gridTemplateColumns = `repeat(${GRID}, var(--cell))`;
-  boardEl.innerHTML = '';
-  grid = Array.from({length:GRID}, (_,r) => Array.from({length:GRID}, (_,c) => {
-    const el = document.createElement('div');
-    el.className = 'cell';
-    el.dataset.r = r; el.dataset.c = c;
-    el.addEventListener('pointerdown', onPointerStart); // unified pointer events
-    el.addEventListener('pointerup', onPointerEnd);
-    el.addEventListener('pointercancel', onPointerCancel);
-    el.addEventListener('click', onClick); // tap support: select/tap
-    boardEl.appendChild(el);
-    return { candy: randomCandy(), el };
-  }));
-  // remove any initial matches
-  resolveInitial().then(()=> render());
-}
-
-function randomCandy(){ return candies[Math.floor(Math.random()*candies.length)]; }
-
-function render(){
-  for(let r=0;r<GRID;r++){
-    for(let c=0;c<GRID;c++){
-      const cell = grid[r][c];
-      cell.el.textContent = cell.candy;
-      cell.el.classList.remove('selected','remove');
+    function init() {
+      board = Array(9).fill("");
+      currentPlayer = "X";
+      gameOver = false;
+      renderBoard();
+      statusEl.textContent = "Player X's turn";
     }
-  }
-  updateHUD();
-}
 
-// pointer events (works for mouse & touch)
-function onPointerStart(e){
-  if (busy) return;
-  const el = e.currentTarget;
-  el.setPointerCapture(e.pointerId);
-  const r = +el.dataset.r, c = +el.dataset.c;
-  touchStart = { r,c, x: e.clientX, y: e.clientY, id: e.pointerId };
-  // allow selecting on press
-  // don't visually mark yet; click handler handles selection
-}
-function onPointerEnd(e){
-  if (!touchStart || touchStart.id !== e.pointerId) { touchStart=null; return; }
-  const el = e.currentTarget;
-  const r2 = +el.dataset.r, c2 = +el.dataset.c;
-  const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
-  // if significant swipe, compute target by direction
-  if (Math.abs(dx) > SWIPE_MIN || Math.abs(dy) > SWIPE_MIN){
-    let dr=0, dc=0;
-    if (Math.abs(dx) > Math.abs(dy)){
-      dc = dx>0?1:-1;
-    } else {
-      dr = dy>0?1:-1;
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      board.forEach((val, i) => {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.textContent = val;
+        cell.onclick = () => handleMove(i);
+        boardEl.appendChild(cell);
+      });
     }
-    const rTarget = touchStart.r + dr;
-    const cTarget = touchStart.c + dc;
-    if (inBounds(rTarget,cTarget)){
-      // swap touchStart cell and target
-      handleSwap(touchStart.r,touchStart.c,rTarget,cTarget);
-    }
-  } else {
-    // treat as a tap on the ended cell -> selection logic (let click() handle)
-    // but click fires after pointerup; ignore here.
-  }
-  touchStart = null;
-  try{ e.currentTarget.releasePointerCapture(e.pointerId);}catch(err){}
-}
-function onPointerCancel(){ touchStart=null; }
 
-// click selection / tap-to-swap adjacent
-function onClick(e){
-  if (busy) return;
-  const el = e.currentTarget;
-  const r = +el.dataset.r, c = +el.dataset.c;
-  if (!selected){
-    selected = {r,c,el};
-    el.classList.add('selected');
-    return;
-  }
-  // if same cell -> deselect
-  if (selected.r === r && selected.c === c){
-    selected.el.classList.remove('selected');
-    selected = null;
-    return;
-  }
-  // if adjacent -> attempt swap
-  if (areAdjacent(selected.r,selected.c,r,c)){
-    handleSwap(selected.r, selected.c, r, c);
-  } else {
-    // choose new selection
-    selected.el.classList.remove('selected');
-    selected = {r,c,el};
-    el.classList.add('selected');
-  }
-}
+    function handleMove(i) {
+      if (board[i] || gameOver) return;
+      board[i] = currentPlayer;
+      renderBoard();
 
-/* swap handler
-   - swap visually/data, check matches
-   - if no match revert swap
-   - consume a move only if swap produced at least one removal
-*/
-async function handleSwap(r1,c1,r2,c2){
-  if (busy) return;
-  busy = true;
-  // clear selection
-  if (selected && selected.el) selected.el.classList.remove('selected');
-  selected = null;
+      if (checkWin(currentPlayer)) {
+        statusEl.textContent = `Player ${currentPlayer} wins!`;
+        showPopup(`🎉 Player ${currentPlayer} wins!`);
+        gameOver = true;
+        return;
+      }
 
-  swap(r1,c1,r2,c2);
-  render();
-  await wait(160);
-  const matches = findAllMatches();
-  if (matches.length === 0){
-    // revert
-    swap(r1,c1,r2,c2);
-    render();
-    busy = false;
-    return;
-  }
-  // valid move:
-  movesLeft = Math.max(0, movesLeft-1);
-  await processMatchesLoop();
-  busy = false;
-  render();
-  checkEnd();
-}
+      if (board.every(c => c)) {
+        statusEl.textContent = "It's a Draw!";
+        showPopup("🤝 It's a Draw!");
+        gameOver = true;
+        return;
+      }
 
-/* basic grid utils */
-function inBounds(r,c){ return r>=0 && r<GRID && c>=0 && c<GRID; }
-function areAdjacent(r1,c1,r2,c2){ return (Math.abs(r1-r2)+Math.abs(c1-c2))===1; }
-function swap(r1,c1,r2,c2){
-  const t = grid[r1][c1].candy; grid[r1][c1].candy = grid[r2][c2].candy; grid[r2][c2].candy = t;
-}
-
-/* match detection: return array of match sets, each set = [{r,c},...] */
-function findAllMatches(){
-  const matches = [];
-  // horizontal runs
-  for (let r=0;r<GRID;r++){
-    let runCandy = null, runStart=0, runLen=0;
-    for (let c=0;c<=GRID;c++){
-      const candy = c<GRID? grid[r][c].candy : null;
-      if (candy === runCandy){
-        runLen++;
+      if (modeEl.value === "2p") {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        statusEl.textContent = `Player ${currentPlayer}'s turn`;
       } else {
-        if (runCandy !== null && runLen>=3){
-          const set = [];
-          for (let k=0;k<runLen;k++) set.push({r, c: runStart + k});
-          matches.push(set);
-        }
-        runCandy = candy;
-        runStart = c;
-        runLen = 1;
+        currentPlayer = "O"; // Computer
+        computerMove();
       }
     }
-  }
-  // vertical runs
-  for (let c=0;c<GRID;c++){
-    let runCandy=null, runStart=0, runLen=0;
-    for (let r=0;r<=GRID;r++){
-      const candy = r<GRID? grid[r][c].candy : null;
-      if (candy === runCandy){ runLen++; }
-      else {
-        if (runCandy !== null && runLen>=3){
-          const set=[];
-          for (let k=0;k<runLen;k++) set.push({r: runStart + k, c});
-          matches.push(set);
+
+    function computerMove() {
+      if (gameOver) return;
+      let move;
+
+      if (levelEl.value === "easy") {
+        const empty = board.map((c, i) => c === "" ? i : null).filter(v => v !== null);
+        move = empty[Math.floor(Math.random() * empty.length)];
+      } else {
+        move = findWinningMove("O") || findWinningMove("X");
+        if (move === null) {
+          const empty = board.map((c, i) => c === "" ? i : null).filter(v => v !== null);
+          move = empty[Math.floor(Math.random() * empty.length)];
         }
-        runCandy = candy; runStart = r; runLen = 1;
       }
-    }
-  }
-  return matches;
-}
 
-/* process loop: detect matches, mark removing, score, remove, collapse, refill, repeat until no matches */
-async function processMatchesLoop(){
-  let combo = 0;
-  while(true){
-    const matches = findAllMatches();
-    if (!matches.length) break;
-    combo++;
-    // unique positions
-    const removeMap = {};
-    matches.forEach(set => set.forEach(p => removeMap[`${p.r},${p.c}`]=p));
-    const positions = Object.values(removeMap);
-    // visual: add remove class
-    positions.forEach(p => grid[p.r][p.c].el.classList.add('remove'));
-    await wait(180);
-    // scoring: base 100 per match-set, bonus per extra candy
-    const base = 100;
-    const totalRemoved = positions.length;
-    score += base * matches.length + 50 * Math.max(0,totalRemoved - 3*matches.length) + (combo-1)*50;
-    // remove candies
-    positions.forEach(p => grid[p.r][p.c].candy = null);
-    render();
-    await wait(80);
-    await collapseFill();
-    render();
-    await wait(120);
-  }
-}
-
-/* gravity: for each column, move down non-null candies, fill top with new candies */
-async function collapseFill(){
-  for (let c=0;c<GRID;c++){
-    let write = GRID-1;
-    for (let r=GRID-1;r>=0;r--){
-      if (grid[r][c].candy !== null){
-        if (write !== r){
-          grid[write][c].candy = grid[r][c].candy;
-        }
-        write--;
+      if (move !== null) {
+        board[move] = "O";
+        renderBoard();
       }
+
+      if (checkWin("O")) {
+        statusEl.textContent = "Computer wins!";
+        showPopup("💻 Computer wins!");
+        gameOver = true;
+        return;
+      }
+
+      if (board.every(c => c)) {
+        statusEl.textContent = "It's a Draw!";
+        showPopup("🤝 It's a Draw!");
+        gameOver = true;
+        return;
+      }
+
+      currentPlayer = "X";
+      statusEl.textContent = "Player X's turn";
     }
-    for (let r=write;r>=0;r--){
-      grid[r][c].candy = randomCandy();
+
+    function findWinningMove(player) {
+      const winPatterns = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      for (let pattern of winPatterns) {
+        const [a,b,c] = pattern;
+        if (board[a] === player && board[b] === player && board[c] === "") return c;
+        if (board[a] === player && board[c] === player && board[b] === "") return b;
+        if (board[b] === player && board[c] === player && board[a] === "") return a;
+      }
+      return null;
     }
-  }
-}
 
-/* avoid starting board having matches */
-async function resolveInitial(){
-  let attempts = 0;
-  while(true){
-    const m = findAllMatches();
-    if (!m.length) break;
-    m.forEach(set => set.forEach(p => grid[p.r][p.c].candy = randomCandy()));
-    attempts++; if (attempts>8) break;
-  }
-}
+    function checkWin(player) {
+      const winPatterns = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      return winPatterns.some(p => p.every(i => board[i] === player));
+    }
 
-/* check win/lose */
-function checkEnd(){
-  if (score >= targetScore){
-    showModal(`🎉 You win! Score: ${score}`);
-  } else if (movesLeft <= 0){
-    showModal(`⛔ Out of moves. Score: ${score}`);
-  }
-}
+    function resetGame() {
+      closePopup();
+      init();
+    }
 
-/* small helpers */
-function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+    function showPopup(message) {
+      popupMessage.textContent = message;
+      popup.style.display = "flex";
+    }
 
-/* modal handling */
-const modal = document.getElementById('modal');
-const modalMessage = document.getElementById('modalMessage');
-document.getElementById('playAgain').addEventListener('click', ()=>{ modal.style.display='none'; restartGame(); });
-document.getElementById('modalHome').addEventListener('click', ()=> location.href='index.html');
+    function closePopup() {
+      popup.style.display = "none";
+    }
 
-function showModal(msg){
-  modalMessage.textContent = msg;
-  modal.style.display = 'flex';
-}
-
-/* selection clearing */
-function clearSelection(){ if (selected){ selected.el.classList.remove('selected'); selected=null; } }
-
-/* initialization / controls */
-function applyLevel(){
-  const opt = levelSelect.selectedOptions[0];
-  targetScore = Number(opt.dataset.target);
-  movesLeft = Number(opt.dataset.moves);
-  levelLabel.textContent = opt.text.split('(')[0].trim();
-  score = 0;
-  updateHUD();
-}
-function restartGame(){
-  applyLevel();
-  clearSelection();
-  makeBoard();
-  render();
-  modal.style.display = 'none';
-}
-restartBtn.addEventListener('click', restartGame);
-levelSelect.addEventListener('change', restartGame);
-
-/* keyboard: optional arrow-key swapping with selection */
-document.addEventListener('keydown', e=>{
-  if (busy) return;
-  if (!selected) return;
-  const r = selected.r, c = selected.c;
-  if (e.key === 'ArrowLeft' && inBounds(r,c-1)) handleSwap(r,c,r,c-1);
-  if (e.key === 'ArrowRight' && inBounds(r,c+1)) handleSwap(r,c,r,c+1);
-  if (e.key === 'ArrowUp' && inBounds(r-1,c)) handleSwap(r,c,r-1,c);
-  if (e.key === 'ArrowDown' && inBounds(r+1,c)) handleSwap(r,c,r+1,c);
-});
-
-/* pointer swipe helper re-use */
-function inBounds(r,c){ return r>=0 && c>=0 && r<GRID && c<GRID; }
-
-/* boot */
-applyLevel();
-makeBoard();
-render();
-
-</script>
+    init();
+  </script>
 </body>
 </html>
