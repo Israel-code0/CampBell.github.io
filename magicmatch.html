@@ -21,7 +21,7 @@
   main{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;align-items:flex-start}
   .board-wrap{background:rgba(255,255,255,0.02);padding:12px;border-radius:12px}
   #board{display:grid;grid-gap:6px;touch-action: none}
-  .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;background:#111;font-size:26px;user-select:none; -webkit-user-select:none; transition:transform .12s,opacity .12s}
+  .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;background:#111;font-size:26px;user-select:none;-webkit-user-select:none;transition:transform .12s,opacity .12s}
   .cell.selected{outline:3px solid rgba(255,255,255,0.12); transform:scale(1.05)}
   .cell.remove{opacity:0; transform:scale(.8)}
   .sidebar{min-width:220px;padding:12px;background:rgba(255,255,255,0.02);border-radius:12px}
@@ -80,57 +80,74 @@
 </div>
 
 <script>
-/* Swipeable Match-3: full implementation */
+/* =========================
+   Config & State
+========================= */
 const GRID = 6;
-const candies = ['🍒','🍋','🍊','🍏','🍇','🍬','🍭','🍩']; // emoji set
-const boardEl = document.getElementById('board');
-const scoreEl = document.getElementById('score');
-const movesEl = document.getElementById('moves');
-const targetEl = document.getElementById('target');
+const candies = ['🍒','🍋','🍊','🍏','🍇','🍬','🍭','🍩'];
+const boardEl   = document.getElementById('board');
+const scoreEl   = document.getElementById('score');
+const movesEl   = document.getElementById('moves');
+const targetEl  = document.getElementById('target');
 const levelSelect = document.getElementById('level');
-const restartBtn = document.getElementById('restart');
-const levelLabel = document.getElementById('levelLabel');
+const restartBtn  = document.getElementById('restart');
+const levelLabel  = document.getElementById('levelLabel');
 
-let grid = []; // {candy,el}
+let grid = [];           // 2D array of { candy, el }
 let selected = null;
 let score = 0;
 let movesLeft = 30;
 let targetScore = 2400;
 let busy = false;
 
-// touch/mouse swipe capture
-let touchStart = null; // {r,c,x,y}
-const SWIPE_MIN = 18;
+// swipe capture
+let touchStart = null; // {r,c,x,y,id}
+let SWIPE_MIN = 14;    // slightly more sensitive for short swipes
 
-function initLevelFromSelect(){
+/* =========================
+   Helpers (DOM & utils)
+========================= */
+function randomCandy(){ return candies[Math.floor(Math.random()*candies.length)]; }
+function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+function updateHUD(){ scoreEl.textContent = score; movesEl.textContent = movesLeft; targetEl.textContent = targetScore; }
+function inBounds(r,c){ return r>=0 && r<GRID && c>=0 && c<GRID; }
+function areAdjacent(r1,c1,r2,c2){ return (Math.abs(r1-r2)+Math.abs(c1-c2))===1; }
+function swap(r1,c1,r2,c2){
+  const t = grid[r1][c1].candy;
+  grid[r1][c1].candy = grid[r2][c2].candy;
+  grid[r2][c2].candy = t;
+}
+
+/* =========================
+   Setup & Rendering
+========================= */
+function applyLevel(){
   const opt = levelSelect.selectedOptions[0];
   targetScore = Number(opt.dataset.target);
-  movesLeft = Number(opt.dataset.moves);
+  movesLeft   = Number(opt.dataset.moves);
   levelLabel.textContent = opt.text.split('(')[0].trim();
   score = 0;
   updateHUD();
 }
-function updateHUD(){ scoreEl.textContent = score; movesEl.textContent = movesLeft; targetEl.textContent = targetScore; }
 
 function makeBoard(){
   boardEl.style.gridTemplateColumns = `repeat(${GRID}, var(--cell))`;
   boardEl.innerHTML = '';
-  grid = Array.from({length:GRID}, (_,r) => Array.from({length:GRID}, (_,c) => {
-    const el = document.createElement('div');
-    el.className = 'cell';
-    el.dataset.r = r; el.dataset.c = c;
-    el.addEventListener('pointerdown', onPointerStart); // unified pointer events
-    el.addEventListener('pointerup', onPointerEnd);
-    el.addEventListener('pointercancel', onPointerCancel);
-    el.addEventListener('click', onClick); // tap support: select/tap
-    boardEl.appendChild(el);
-    return { candy: randomCandy(), el };
-  }));
-  // remove any initial matches
-  resolveInitial().then(()=> render());
+  grid = Array.from({length:GRID}, (_,r) =>
+    Array.from({length:GRID}, (_,c) => {
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.dataset.r = r; el.dataset.c = c;
+      el.addEventListener('pointerdown', onPointerStart);
+      el.addEventListener('pointerup',   onPointerEnd);
+      el.addEventListener('pointercancel', onPointerCancel);
+      el.addEventListener('click', onClick);
+      boardEl.appendChild(el);
+      return { candy: randomCandy(), el };
+    })
+  );
+  resolveInitial().then(render);
 }
-
-function randomCandy(){ return candies[Math.floor(Math.random()*candies.length)]; }
 
 function render(){
   for(let r=0;r<GRID;r++){
@@ -143,45 +160,46 @@ function render(){
   updateHUD();
 }
 
-// pointer events (works for mouse & touch)
+/* Make sure starting board has no instant matches */
+async function resolveInitial(){
+  let attempts = 0;
+  while(true){
+    const m = findAllMatches();
+    if (!m.length) break;
+    m.forEach(set => set.forEach(p => grid[p.r][p.c].candy = randomCandy()));
+    attempts++; if (attempts>20) break;
+  }
+}
+
+/* =========================
+   Input (click / swipe)
+========================= */
 function onPointerStart(e){
   if (busy) return;
   const el = e.currentTarget;
   el.setPointerCapture(e.pointerId);
   const r = +el.dataset.r, c = +el.dataset.c;
   touchStart = { r,c, x: e.clientX, y: e.clientY, id: e.pointerId };
-  // allow selecting on press
-  // don't visually mark yet; click handler handles selection
 }
 function onPointerEnd(e){
-  if (!touchStart || touchStart.id !== e.pointerId) { touchStart=null; return; }
+  if (!touchStart || touchStart.id !== e.pointerId){ touchStart=null; return; }
   const el = e.currentTarget;
-  const r2 = +el.dataset.r, c2 = +el.dataset.c;
   const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
-  // if significant swipe, compute target by direction
+
   if (Math.abs(dx) > SWIPE_MIN || Math.abs(dy) > SWIPE_MIN){
     let dr=0, dc=0;
-    if (Math.abs(dx) > Math.abs(dy)){
-      dc = dx>0?1:-1;
-    } else {
-      dr = dy>0?1:-1;
-    }
+    if (Math.abs(dx) > Math.abs(dy)) dc = dx>0?1:-1; else dr = dy>0?1:-1;
     const rTarget = touchStart.r + dr;
     const cTarget = touchStart.c + dc;
     if (inBounds(rTarget,cTarget)){
-      // swap touchStart cell and target
       handleSwap(touchStart.r,touchStart.c,rTarget,cTarget);
     }
-  } else {
-    // treat as a tap on the ended cell -> selection logic (let click() handle)
-    // but click fires after pointerup; ignore here.
   }
   touchStart = null;
-  try{ e.currentTarget.releasePointerCapture(e.pointerId);}catch(err){}
+  try{ e.currentTarget.releasePointerCapture(e.pointerId);}catch(_){}
 }
 function onPointerCancel(){ touchStart=null; }
 
-// click selection / tap-to-swap adjacent
 function onClick(e){
   if (busy) return;
   const el = e.currentTarget;
@@ -191,131 +209,101 @@ function onClick(e){
     el.classList.add('selected');
     return;
   }
-  // if same cell -> deselect
   if (selected.r === r && selected.c === c){
     selected.el.classList.remove('selected');
     selected = null;
     return;
   }
-  // if adjacent -> attempt swap
   if (areAdjacent(selected.r,selected.c,r,c)){
     handleSwap(selected.r, selected.c, r, c);
   } else {
-    // choose new selection
     selected.el.classList.remove('selected');
     selected = {r,c,el};
     el.classList.add('selected');
   }
 }
 
-/* swap handler
-   - swap visually/data, check matches
-   - if no match revert swap
-   - consume a move only if swap produced at least one removal
-*/
-async function handleSwap(r1,c1,r2,c2){
-  if (busy) return;
-  busy = true;
-  // clear selection
-  if (selected && selected.el) selected.el.classList.remove('selected');
-  selected = null;
-
-  swap(r1,c1,r2,c2);
-  render();
-  await wait(160);
-  const matches = findAllMatches();
-  if (matches.length === 0){
-    // revert
-    swap(r1,c1,r2,c2);
-    render();
-    busy = false;
-    return;
-  }
-  // valid move:
-  movesLeft = Math.max(0, movesLeft-1);
-  await processMatchesLoop();
-  busy = false;
-  render();
-  checkEnd();
-}
-
-/* basic grid utils */
-function inBounds(r,c){ return r>=0 && r<GRID && c>=0 && c<GRID; }
-function areAdjacent(r1,c1,r2,c2){ return (Math.abs(r1-r2)+Math.abs(c1-c2))===1; }
-function swap(r1,c1,r2,c2){
-  const t = grid[r1][c1].candy; grid[r1][c1].candy = grid[r2][c2].candy; grid[r2][c2].candy = t;
-}
-
-/* match detection: return array of match sets, each set = [{r,c},...] */
+/* =========================
+   Match Logic
+========================= */
 function findAllMatches(){
   const matches = [];
-  // horizontal runs
+  // horizontal
   for (let r=0;r<GRID;r++){
     let runCandy = null, runStart=0, runLen=0;
     for (let c=0;c<=GRID;c++){
-      const candy = c<GRID? grid[r][c].candy : null;
-      if (candy === runCandy){
-        runLen++;
-      } else {
-        if (runCandy !== null && runLen>=3){
-          const set = [];
-          for (let k=0;k<runLen;k++) set.push({r, c: runStart + k});
-          matches.push(set);
-        }
-        runCandy = candy;
-        runStart = c;
-        runLen = 1;
-      }
-    }
-  }
-  // vertical runs
-  for (let c=0;c<GRID;c++){
-    let runCandy=null, runStart=0, runLen=0;
-    for (let r=0;r<=GRID;r++){
-      const candy = r<GRID? grid[r][c].candy : null;
+      const candy = c<GRID ? grid[r][c].candy : null;
       if (candy === runCandy){ runLen++; }
       else {
         if (runCandy !== null && runLen>=3){
-          const set=[];
-          for (let k=0;k<runLen;k++) set.push({r: runStart + k, c});
+          const set=[]; for(let k=0;k<runLen;k++) set.push({r,c:runStart+k});
           matches.push(set);
         }
-        runCandy = candy; runStart = r; runLen = 1;
+        runCandy=candy; runStart=c; runLen=1;
+      }
+    }
+  }
+  // vertical
+  for (let c=0;c<GRID;c++){
+    let runCandy = null, runStart=0, runLen=0;
+    for (let r=0;r<=GRID;r++){
+      const candy = r<GRID ? grid[r][c].candy : null;
+      if (candy === runCandy){ runLen++; }
+      else {
+        if (runCandy !== null && runLen>=3){
+          const set=[]; for(let k=0;k<runLen;k++) set.push({r:runStart+k,c});
+          matches.push(set);
+        }
+        runCandy=candy; runStart=r; runLen=1;
       }
     }
   }
   return matches;
 }
 
-/* process loop: detect matches, mark removing, score, remove, collapse, refill, repeat until no matches */
-async function processMatchesLoop(){
-  let combo = 0;
-  while(true){
-    const matches = findAllMatches();
-    if (!matches.length) break;
-    combo++;
-    // unique positions
-    const removeMap = {};
-    matches.forEach(set => set.forEach(p => removeMap[`${p.r},${p.c}`]=p));
-    const positions = Object.values(removeMap);
-    // visual: add remove class
-    positions.forEach(p => grid[p.r][p.c].el.classList.add('remove'));
-    await wait(180);
-    // scoring: base 100 per match-set, bonus per extra candy
-    const base = 100;
-    const totalRemoved = positions.length;
-    score += base * matches.length + 50 * Math.max(0,totalRemoved - 3*matches.length) + (combo-1)*50;
-    // remove candies
-    positions.forEach(p => grid[p.r][p.c].candy = null);
-    render();
-    await wait(80);
-    await collapseFill();
-    render();
-    await wait(120);
+/* Any possible move that would yield a match? */
+function hasPossibleMove(){
+  for(let r=0;r<GRID;r++){
+    for(let c=0;c<GRID;c++){
+      // try right
+      if (c+1<GRID){
+        swap(r,c,r,c+1);
+        if (findAllMatches().length){ swap(r,c,r,c+1); return true; }
+        swap(r,c,r,c+1);
+      }
+      // try down
+      if (r+1<GRID){
+        swap(r,c,r+1,c);
+        if (findAllMatches().length){ swap(r,c,r+1,c); return true; }
+        swap(r,c,r+1,c);
+      }
+    }
   }
+  return false;
 }
 
-/* gravity: for each column, move down non-null candies, fill top with new candies */
+/* Shuffle until there are valid moves and no instant matches */
+function shuffleBoard(){
+  let flat = [];
+  for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++) flat.push(grid[r][c].candy);
+
+  let attempts = 0;
+  do {
+    // Fisher–Yates shuffle
+    for(let i=flat.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [flat[i],flat[j]] = [flat[j],flat[i]];
+    }
+    // refill
+    let k=0;
+    for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++) grid[r][c].candy = flat[k++];
+    attempts++;
+  } while ((findAllMatches().length || !hasPossibleMove()) && attempts<50);
+
+  render();
+}
+
+/* Drop and refill (gravity) */
 async function collapseFill(){
   for (let c=0;c<GRID;c++){
     let write = GRID-1;
@@ -333,18 +321,81 @@ async function collapseFill(){
   }
 }
 
-/* avoid starting board having matches */
-async function resolveInitial(){
-  let attempts = 0;
+/* Core resolution loop: remove, score, drop, refill until stable */
+async function processMatchesLoop(){
+  let combo = 0;
   while(true){
-    const m = findAllMatches();
-    if (!m.length) break;
-    m.forEach(set => set.forEach(p => grid[p.r][p.c].candy = randomCandy()));
-    attempts++; if (attempts>8) break;
+    const matches = findAllMatches();
+    if (!matches.length) break;
+
+    combo++;
+
+    // unique positions
+    const removeMap = {};
+    matches.forEach(set => set.forEach(p => removeMap[`${p.r},${p.c}`]=p));
+    const positions = Object.values(removeMap);
+
+    // visuals
+    positions.forEach(p => grid[p.r][p.c].el.classList.add('remove'));
+    await wait(160);
+
+    // scoring: 100 per set, +50 per extra beyond 3 in that set, +combo bonus
+    let extras = 0;
+    matches.forEach(set => { if (set.length>3) extras += (set.length - 3); });
+    score += 100*matches.length + 50*extras + (combo-1)*50;
+
+    // remove
+    positions.forEach(p => grid[p.r][p.c].candy = null);
+    render();
+    await wait(90);
+
+    // gravity + refill
+    await collapseFill();
+    render();
+    await wait(120);
+  }
+
+  // If stuck, shuffle
+  if (!hasPossibleMove()){
+    await wait(250);
+    shuffleBoard();
   }
 }
 
-/* check win/lose */
+/* =========================
+   Swapping
+========================= */
+async function handleSwap(r1,c1,r2,c2){
+  if (busy) return;
+  busy = true;
+  if (selected && selected.el) selected.el.classList.remove('selected');
+  selected = null;
+
+  swap(r1,c1,r2,c2);
+  render();
+  await wait(150);
+
+  const matches = findAllMatches();
+  if (!matches.length){
+    // revert if no match
+    swap(r1,c1,r2,c2);
+    render();
+    busy = false;
+    return;
+  }
+
+  // valid move consumes a move
+  movesLeft = Math.max(0, movesLeft-1);
+  await processMatchesLoop();
+  render();
+  checkEnd();
+
+  busy = false;
+}
+
+/* =========================
+   Endgame & Modal
+========================= */
 function checkEnd(){
   if (score >= targetScore){
     showModal(`🎉 You win! Score: ${score}`);
@@ -353,10 +404,6 @@ function checkEnd(){
   }
 }
 
-/* small helpers */
-function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-/* modal handling */
 const modal = document.getElementById('modal');
 const modalMessage = document.getElementById('modalMessage');
 document.getElementById('playAgain').addEventListener('click', ()=>{ modal.style.display='none'; restartGame(); });
@@ -367,18 +414,11 @@ function showModal(msg){
   modal.style.display = 'flex';
 }
 
-/* selection clearing */
+/* =========================
+   Boot / Controls
+========================= */
 function clearSelection(){ if (selected){ selected.el.classList.remove('selected'); selected=null; } }
 
-/* initialization / controls */
-function applyLevel(){
-  const opt = levelSelect.selectedOptions[0];
-  targetScore = Number(opt.dataset.target);
-  movesLeft = Number(opt.dataset.moves);
-  levelLabel.textContent = opt.text.split('(')[0].trim();
-  score = 0;
-  updateHUD();
-}
 function restartGame(){
   applyLevel();
   clearSelection();
@@ -386,28 +426,24 @@ function restartGame(){
   render();
   modal.style.display = 'none';
 }
+
 restartBtn.addEventListener('click', restartGame);
 levelSelect.addEventListener('change', restartGame);
 
-/* keyboard: optional arrow-key swapping with selection */
+// Optional keyboard nudges (desktop)
 document.addEventListener('keydown', e=>{
-  if (busy) return;
-  if (!selected) return;
+  if (busy || !selected) return;
   const r = selected.r, c = selected.c;
-  if (e.key === 'ArrowLeft' && inBounds(r,c-1)) handleSwap(r,c,r,c-1);
+  if (e.key === 'ArrowLeft'  && inBounds(r,c-1)) handleSwap(r,c,r,c-1);
   if (e.key === 'ArrowRight' && inBounds(r,c+1)) handleSwap(r,c,r,c+1);
-  if (e.key === 'ArrowUp' && inBounds(r-1,c)) handleSwap(r,c,r-1,c);
-  if (e.key === 'ArrowDown' && inBounds(r+1,c)) handleSwap(r,c,r+1,c);
+  if (e.key === 'ArrowUp'    && inBounds(r-1,c)) handleSwap(r,c,r-1,c);
+  if (e.key === 'ArrowDown'  && inBounds(r+1,c)) handleSwap(r,c,r+1,c);
 });
 
-/* pointer swipe helper re-use */
-function inBounds(r,c){ return r>=0 && c>=0 && r<GRID && c<GRID; }
-
-/* boot */
+// start
 applyLevel();
 makeBoard();
 render();
-
 </script>
 </body>
 </html>
