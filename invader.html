@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Space Invaders Mobile</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #gameCanvas {
+      background: #111;
+      border: 2px solid #444;
+      border-radius: 10px;
+      display: block;
+      margin: 10px auto;
+      touch-action: none;
+    }
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      font-size: 18px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 10px;
+      background: #444;
+      color: white;
+      cursor: pointer;
+    }
+    .controls button:active {
+      background: #666;
+    }
+    #status {
+      margin: 8px;
+      font-size: 22px;
+      font-weight: bold;
+      color: yellow;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="status">❤️ Lives: 3</div>
+
+  <!-- Game Control Buttons -->
+  <div class="controls">
+    <button id="homeBtn">Home</button>
+    <button id="leftBtn">◀</button>
+    <button id="restartBtn">Restart</button>
+    <button id="rightBtn">▶</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const statusText = document.getElementById("status");
+
+    // Responsive canvas
+    canvas.width = window.innerWidth < 600 ? window.innerWidth - 20 : 600;
+    canvas.height = window.innerHeight < 800 ? window.innerHeight - 150 : 600;
+
+    // Player
+    const player = { x: canvas.width / 2 - 20, y: canvas.height - 40, w: 40, h: 20, speed: 6 };
+
+    // Bullets
+    let bullets = [];
+    let enemyBullets = [];
+
+    // Enemies
+    let enemies = [];
+    const rows = 3, cols = 6, enemySize = 30;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        enemies.push({ x: 60 + c * 70, y: 40 + r * 50, w: enemySize, h: enemySize });
+      }
+    }
+
+    // Sounds
+    const shootSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    const explosionSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+    const enemyShootSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+
+    // Auto shooting
+    setInterval(() => {
+      bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, w: 4, h: 10, speed: 7 });
+      shootSound.currentTime = 0;
+      shootSound.play();
+    }, 500);
+
+    // Enemy shooting
+    setInterval(() => {
+      if (enemies.length > 0) {
+        let e = enemies[Math.floor(Math.random() * enemies.length)];
+        enemyBullets.push({ x: e.x + e.w / 2 - 2, y: e.y + e.h, w: 4, h: 10, speed: 4 });
+        enemyShootSound.currentTime = 0;
+        enemyShootSound.play();
+      }
+    }, 1000);
+
+    // Movement
+    let leftPressed = false, rightPressed = false;
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowLeft") leftPressed = true;
+      if (e.key === "ArrowRight") rightPressed = true;
+    });
+    document.addEventListener("keyup", e => {
+      if (e.key === "ArrowLeft") leftPressed = false;
+      if (e.key === "ArrowRight") rightPressed = false;
+    });
+
+    // Mobile buttons
+    document.getElementById("leftBtn").addEventListener("touchstart", () => leftPressed = true);
+    document.getElementById("leftBtn").addEventListener("touchend", () => leftPressed = false);
+    document.getElementById("rightBtn").addEventListener("touchstart", () => rightPressed = true);
+    document.getElementById("rightBtn").addEventListener("touchend", () => rightPressed = false);
+
+    // Restart
+    document.getElementById("restartBtn").addEventListener("click", () => location.reload());
+
+    // Home button (replace link with your homepage)
+    document.getElementById("homeBtn").addEventListener("click", () => {
+      window.location.href = "index.html"; // Change "index.html" to your home page file
+    });
+
+    let lives = 3;
+    let gameOver = false;
+
+    // Game Loop
+    function gameLoop() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Move player
+      if (leftPressed && player.x > 0) player.x -= player.speed;
+      if (rightPressed && player.x + player.w < canvas.width) player.x += player.speed;
+
+      // Draw player
+      ctx.fillStyle = "lime";
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      // Draw bullets
+      ctx.fillStyle = "yellow";
+      for (let i = 0; i < bullets.length; i++) {
+        let b = bullets[i];
+        b.y -= b.speed;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+
+        if (b.y < 0) bullets.splice(i, 1);
+      }
+
+      // Enemy bullets
+      ctx.fillStyle = "cyan";
+      for (let i = 0; i < enemyBullets.length; i++) {
+        let eb = enemyBullets[i];
+        eb.y += eb.speed;
+        ctx.fillRect(eb.x, eb.y, eb.w, eb.h);
+
+        // Check collision with player
+        if (eb.x < player.x + player.w && eb.x + eb.w > player.x && eb.y < player.y + player.h && eb.y + eb.h > player.y) {
+          enemyBullets.splice(i, 1);
+          lives--;
+          statusText.innerText = "❤️ Lives: " + lives;
+          if (lives <= 0) {
+            statusText.innerText = "💀 GAME OVER 💀";
+            gameOver = true;
+            return;
+          }
+        }
+
+        if (eb.y > canvas.height) enemyBullets.splice(i, 1);
+      }
+
+      // Draw enemies
+      ctx.fillStyle = "red";
+      for (let i = 0; i < enemies.length; i++) {
+        let e = enemies[i];
+        ctx.fillRect(e.x, e.y, e.w, e.h);
+
+        // Collision with bullets
+        for (let j = 0; j < bullets.length; j++) {
+          let b = bullets[j];
+          if (b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
+            enemies.splice(i, 1);
+            bullets.splice(j, 1);
+            explosionSound.currentTime = 0;
+            explosionSound.play();
+            break;
+          }
+        }
+      }
+
+      // Win condition
+      if (enemies.length === 0) {
+        statusText.innerText = "🎉 YOU WIN! 🎉";
+        return;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+  </script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Checkers</title>
+<style>
+  /* existing CSS remains unchanged */
+  :root{
+    --board-size: min(92vmin,720px);
+    --light: #f0d9b5;
+    --dark: #b58863;
+    --highlight: #4fc3f7;
+    --capture: #ff8a80;
+    --red: #c62828;
+    --black: #2b2b2b;
+  }
+  body{
+    margin:0;
+    font-family: Inter, system-ui, Arial;
+    display:flex;
+    min-height:100vh;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(180deg,#234,#012);
+    color:white;
+    padding:16px;
+    box-sizing:border-box;
+  }
+  .container{
+    width:var(--board-size);
+    max-width:100%;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  h1{font-size:18px;margin:0}
+  .controls {display:flex;gap:8px;align-items:center;}
+  button{
+    background:#fff2;border-radius:10px;border:none;padding:8px 12px;font-weight:600;cursor:pointer;
+  }
+  #status{font-size:14px;opacity:.95;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06)}
+  /* board and pieces remain unchanged */
+  .board {
+    width:100%;
+    aspect-ratio:1/1;
+    display:grid;
+    grid-template-columns: repeat(8,1fr);
+    border-radius:12px;
+    overflow:hidden;
+    position:relative;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    touch-action: manipulation;
+  }
+  .square {
+    width:100%;
+    height:100%;
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    user-select:none;
+    position:relative;
+  }
+  .light { background:var(--light); }
+  .dark { background:var(--dark); }
+  .square.highlight::after {
+    content:"";
+    position:absolute; inset:0; background: linear-gradient(to bottom right, rgba(79,195,247,0.18), rgba(79,195,247,0.08)); pointer-events:none;
+  }
+  .square.capture::after {
+    content:"";
+    position:absolute; inset:0; background: linear-gradient(to bottom right, rgba(255,138,128,0.22), rgba(255,138,128,0.06)); pointer-events:none;
+  }
+  .piece {
+    width:72%;
+    height:72%;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:white;font-size:16px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.5), inset 0 2px 6px rgba(255,255,255,0.06);
+    transition: transform 120ms ease, box-shadow 120ms;
+    touch-action: none;
+  }
+  .piece.red{ background: linear-gradient(180deg,var(--red), #b71c1c); }
+  .piece.black{ background: linear-gradient(180deg,var(--black), #111); }
+  .piece.king{ box-shadow: 0 8px 20px rgba(255,215,0,0.12); }
+  .piece:active{ transform: scale(0.97); }
+  .marker {
+    width:36%; height:36%; border-radius:50%; background: rgba(255,255,255,0.3); position:absolute; pointer-events:none;
+  }
+  .piece.crown::after{
+    content: "♔";
+    font-size:18px; position:relative; top:1px;
+  }
+  .coords{ position:absolute; font-size:10px; opacity:.06; bottom:2px; right:4px }
+  @media (max-width:600px){
+    h1{font-size:16px}
+    button{padding:8px 10px}
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚪ Checkers</h1>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div id="status">Turn: <strong id="turnText">Red</strong></div>
+        <div class="controls">
+          <select id="modeSelect">
+            <option value="2p" selected>2 Player</option>
+            <option value="ai">Single Player (AI)</option>
+          </select>
+          <select id="playerColorSelect">
+            <option value="red" selected>Play Red</option>
+            <option value="black">Play Black</option>
+          </select>
+          <button id="restartBtn">Restart</button>
+          <button onclick="location.href='index.html'">🏠 Home</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="board" class="board" aria-label="Checkers board"></div>
+  </div>
+
+<script>
+// --- Existing game state ---
+const ROWS = 8, COLS = 8;
+const boardEl = document.getElementById('board');
+const restartBtn = document.getElementById('restartBtn');
+const turnText = document.getElementById('turnText');
+const modeSelect = document.getElementById('modeSelect');
+const playerColorSelect = document.getElementById('playerColorSelect');
+
+let state = { turn: 'red', board: [], selected: null, forcedJumps: [], mustContinue: false };
+let ai = {enabled:false, color:'black'};
+
+// audio
+const moveSound = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+const captureSound = new Audio('https://actions.google.com/sounds/v1/cartoon/metal_chime.ogg');
+
+// --- Initialize Board ---
+function initBoard(){
+  state.board = Array.from({length:ROWS}, ()=> Array(COLS).fill(null));
+  for(let r=0;r<3;r++) for(let c=0;c<COLS;c++) if((r+c)%2===1) state.board[r][c] = {color:'black', king:false};
+  for(let r=5;r<8;r++) for(let c=0;c<COLS;c++) if((r+c)%2===1) state.board[r][c] = {color:'red', king:false};
+  state.turn = 'red';
+  state.selected = null;
+  state.mustContinue = false;
+  updateForcedJumps();
+  render();
+  updateAISettings();
+}
+
+// --- Utility functions ---
+function coordsToIndex(r,c){ return r*COLS + c; }
+function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
+function opposite(color){ return color==='red' ? 'black' : 'red'; }
+
+// --- Forced jumps ---
+function updateForcedJumps(){
+  state.forcedJumps = [];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const p = state.board[r][c];
+      if(p && p.color === state.turn){
+        const jumps = getJumpsFrom(r,c,p, state.board);
+        if(jumps.length) state.forcedJumps.push({r,c,targets:jumps});
+      }
+    }
+  }
+}
+
+// --- Moves / Jumps ---
+function getMovesFrom(r,c,piece, boardGrid){
+  const dirs = piece.king ? [[1,1],[1,-1],[-1,1],[-1,-1]] :
+    (piece.color==='red' ? [[-1,1],[-1,-1]] : [[1,1],[1,-1]]);
+  const moves = [];
+  for(const [dr,dc] of dirs){
+    const nr = r+dr, nc = c+dc;
+    if(inBounds(nr,nc) && !boardGrid[nr][nc]) moves.push({r:nr,c:nc});
+  }
+  return moves;
+}
+function getJumpsFrom(r,c,piece, boardGrid){
+  const dirs = piece.king ? [[1,1],[1,-1],[-1,1],[-1,-1]] :
+    (piece.color==='red' ? [[-1,1],[-1,-1]] : [[1,1],[1,-1]]);
+  const jumps = [];
+  for(const [dr,dc] of dirs){
+    const midR = r+dr, midC = c+dc;
+    const nr = r+dr*2, nc = c+dc*2;
+    if(inBounds(nr,nc) && boardGrid[midR] && boardGrid[midR][midC] && boardGrid[midR][midC].color === opposite(piece.color) && !boardGrid[nr][nc]){
+      jumps.push({r:nr,c:nc, overR:midR, overC:midC});
+    }
+  }
+  return jumps;
+}
+
+// --- Render ---
+function render(){
+  boardEl.innerHTML = '';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const square = document.createElement('div');
+      square.className = `square ${(r+c)%2===0 ? 'light':'dark'}`;
+      square.dataset.r = r;
+      square.dataset.c = c;
+      square.addEventListener('click', onSquareClick);
+      if(state.forcedJumps.some(j=>j.r===r && j.c===c)) square.classList.add('capture');
+      if(state.selected && state.selected.r===r && state.selected.c===c) square.classList.add('highlight');
+      const p = state.board[r][c];
+      if(p){
+        const pieceEl = document.createElement('div');
+        pieceEl.className = `piece ${p.color}${p.king?' king':''}`;
+        if(p.king) pieceEl.classList.add('crown');
+        square.appendChild(pieceEl);
+      } else if(state.selected){
+        const selP = state.board[state.selected.r][state.selected.c];
+        if(selP){
+          const moves = state.forcedJumps.length ? getJumpsFrom(state.selected.r,state.selected.c,selP,state.board) : getMovesFrom(state.selected.r,state.selected.c,selP,state.board);
+          if(moves.some(m=>m.r===r && m.c===c)) square.classList.add('highlight');
+        }
+      }
+      boardEl.appendChild(square);
+    }
+  }
+  turnText.textContent = state.turn[0].toUpperCase() + state.turn.slice(1);
+  maybeTriggerAI();
+}
+
+// --- Click Handler ---
+function onSquareClick(e){
+  if(ai.enabled && state.turn===ai.color) return; // ignore clicks on AI turn
+  const r = parseInt(e.currentTarget.dataset.r), c=parseInt(e.currentTarget.dataset.c);
+  const piece = state.board[r][c];
+  if(state.mustContinue){
+    const jumps = getJumpsFrom(state.selected.r,state.selected.c,state.board[state.selected.r][state.selected.c],state.board);
+    const found = jumps.find(j=>j.r===r && j.c===c);
+    if(found){ performJump(state.selected.r,state.selected.c,found); return; }
+    return;
+  }
+  if(piece && piece.color===state.turn){
+    if(state.forcedJumps.length && !state.forcedJumps.some(j=>j.r===r && j.c===c)) return;
+    state.selected={r,c};
+    render();
+    return;
+  }
+  if(state.selected){
+    const sel = state.selected;
+    const selPiece = state.board[sel.r][sel.c];
+    if(!selPiece){ state.selected=null; render(); return; }
+    const jumps = getJumpsFrom(sel.r, sel.c, selPiece, state.board);
+    const jumpTarget = jumps.find(j=>j.r===r && j.c===c);
+    if(jumpTarget){ performJump(sel.r,sel.c,jumpTarget); return; }
+    if(state.forcedJumps.length) return;
+    const moves = getMovesFrom(sel.r, sel.c, selPiece, state.board);
+    if(moves.some(m=>m.r===r && m.c===c)){ performMove(sel.r,sel.c,r,c); return; }
+    state.selected=null; render();
+  }
+}
+
+// --- Perform Moves / Jumps ---
+function performMove(sr, sc, tr, tc){
+  const piece = state.board[sr][sc];
+  state.board[tr][tc]=piece; state.board[sr][sc]=null;
+  if((piece.color==='red' && tr===0) || (piece.color==='black' && tr===ROWS-1)) piece.king=true;
+  moveSound.play();
+  state.selected=null; state.turn=opposite(state.turn); state.mustContinue=false;
+  updateForcedJumps(); checkEnd(); render();
+}
+function performJump(sr, sc, jumpObj){
+  const piece = state.board[sr][sc];
+  state.board[jumpObj.overR][jumpObj.overC]=null;
+  state.board[jumpObj.r][jumpObj.c]=piece; state.board[sr][sc]=null;
+  if((piece.color==='red' && jumpObj.r===0) || (piece.color==='black' && jumpObj.r===ROWS-1)) piece.king=true;
+  captureSound.play();
+  const more = getJumpsFrom(jumpObj.r,jumpObj.c,piece,state.board);
+  if(more.length){ state.selected={r:jumpObj.r,c:jumpObj.c}; state.mustContinue=true; render(); return; }
+  state.selected=null; state.mustContinue=false; state.turn=opposite(state.turn); updateForcedJumps(); checkEnd(); render();
+}
+
+// --- End game ---
+function checkEnd(){
+  const pieces = [];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const p = state.board[r][c]; if(p && p.color===state.turn) pieces.push({r,c,p});
+  }
+  if(pieces.length===0){ alert(`${opposite(state.turn).toUpperCase()} wins!`); initBoard(); return; }
+  let canMove=false;
+  for(const item of pieces){
+    if(getMovesFrom(item.r,item.c,item.p,state.board).length || getJumpsFrom(item.r,item.c,item.p,state.board).length){ canMove=true; break; }
+  }
+  if(!canMove){ alert(`${opposite(state.turn).toUpperCase()} wins!`); initBoard(); return; }
+}
+
+// --- AI ---
+function updateAISettings(){
+  ai.enabled = modeSelect.value==='ai';
+  ai.color = opposite(playerColorSelect.value);
+}
+function maybeTriggerAI(){
+  if(!ai.enabled || state.turn!==ai.color) return;
+  setTimeout(()=> aiMove(), 300 + Math.random()*400);
+}
+function aiMove(){
+  const pieces = [];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const p = state.board[r][c]; if(p && p.color===ai.color) pieces.push({r,c,p});
+  }
+  // prefer jumps
+  const jumpOptions = [];
+  for(const item of pieces){
+    const jumps = getJumpsFrom(item.r,item.c,item.p,state.board);
+    for(const j of jumps) jumpOptions.push({sr:item.r,sc:item.c,jump:j});
+  }
+  if(jumpOptions.length){
+    const choice = jumpOptions[Math.floor(Math.random()*jumpOptions.length)];
+    performJump(choice.sr, choice.sc, choice.jump);
+    return;
+  }
+  // normal moves
+  const moveOptions = [];
+  for(const item of pieces){
+    const moves = getMovesFrom(item.r,item.c,item.p,state.board);
+    for(const m of moves) moveOptions.push({sr:item.r,sc:item.c,tr:m.r,tc:m.c});
+  }
+  if(moveOptions.length){
+    const choice = moveOptions[Math.floor(Math.random()*moveOptions.length)];
+    performMove(choice.sr,choice.sc,choice.tr,choice.tc);
+  }
+}
+
+// --- Controls ---
+restartBtn.addEventListener('click', ()=> initBoard());
+modeSelect.addEventListener('change', ()=> updateAISettings());
+playerColorSelect.addEventListener('change', ()=> updateAISettings());
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ state.selected=null; render(); }});
+
+// --- Init ---
+initBoard();
+</script>
+</body>
+</html>

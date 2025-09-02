@@ -16,20 +16,28 @@
   h1{font-size:20px;margin:0}
   .controls{display:flex;gap:8px;align-items:center}
   select,button{background:rgba(255,255,255,0.04);border:0;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
-  .hud{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
+  .hud{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;align-items:center}
   .badge{background:rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px}
   main{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;align-items:flex-start}
   .board-wrap{background:rgba(255,255,255,0.02);padding:12px;border-radius:12px}
   #board{display:grid;grid-gap:6px;touch-action: none}
-  .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;background:#111;font-size:26px;user-select:none;-webkit-user-select:none;transition:transform .12s,opacity .12s}
+  .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;background:#111;font-size:26px;user-select:none;-webkit-user-select:none;transition:transform .18s,opacity .18s}
   .cell.selected{outline:3px solid rgba(255,255,255,0.12); transform:scale(1.05)}
-  .cell.remove{opacity:0; transform:scale(.8)}
+  .cell.remove{opacity:0; transform:scale(.6)}
   .sidebar{min-width:220px;padding:12px;background:rgba(255,255,255,0.02);border-radius:12px}
   .big{font-size:26px;color:var(--accent);font-weight:700}
   .small{font-size:13px;opacity:.9}
   #modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:60}
   #modal .card{background:#132025;padding:20px;border-radius:12px;text-align:center}
   #modal button{margin-top:12px}
+  /* Candy gradient classes (optional visuals if you later use them) */
+  .candy { font-size:24px }
+  .candy.red    { background: linear-gradient(135deg, #ff4e50, #f9d423); }
+  .candy.blue   { background: linear-gradient(135deg, #24c6dc, #514a9d); }
+  .candy.green  { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+  .candy.yellow { background: linear-gradient(135deg, #f7971e, #ffd200); }
+  .candy.purple { background: linear-gradient(135deg, #654ea3, #eaafc8); }
+
   @media (max-width:720px){:root{--cell:44px};main{flex-direction:column}.sidebar{width:100%}}
 </style>
 </head>
@@ -48,6 +56,7 @@
     </div>
   </header>
 
+  <!-- single HUD -->
   <div class="hud">
     <div class="badge">Score: <strong id="score">0</strong></div>
     <div class="badge">Moves: <strong id="moves">30</strong></div>
@@ -79,6 +88,9 @@
   </div>
 </div>
 
+<!-- pop sound -->
+<audio id="popSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" preload="auto"></audio>
+
 <script>
 /* =========================
    Config & State
@@ -92,6 +104,7 @@ const targetEl  = document.getElementById('target');
 const levelSelect = document.getElementById('level');
 const restartBtn  = document.getElementById('restart');
 const levelLabel  = document.getElementById('levelLabel');
+const popSound = document.getElementById('popSound');
 
 let grid = [];           // 2D array of { candy, el }
 let selected = null;
@@ -154,6 +167,7 @@ function render(){
     for(let c=0;c<GRID;c++){
       const cell = grid[r][c];
       cell.el.textContent = cell.candy;
+      // ensure classes are reset
       cell.el.classList.remove('selected','remove');
     }
   }
@@ -335,17 +349,22 @@ async function processMatchesLoop(){
     matches.forEach(set => set.forEach(p => removeMap[`${p.r},${p.c}`]=p));
     const positions = Object.values(removeMap);
 
-    // visuals
+    // visuals: add remove class
     positions.forEach(p => grid[p.r][p.c].el.classList.add('remove'));
-    await wait(160);
+
+    // play pop sound
+    try { popSound.currentTime = 0; popSound.play(); } catch(e){}
+
+    await wait(180);
 
     // scoring: 100 per set, +50 per extra beyond 3 in that set, +combo bonus
     let extras = 0;
     matches.forEach(set => { if (set.length>3) extras += (set.length - 3); });
     score += 100*matches.length + 50*extras + (combo-1)*50;
 
-    // remove
+    // remove candies logically
     positions.forEach(p => grid[p.r][p.c].candy = null);
+
     render();
     await wait(90);
 

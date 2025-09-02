@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Candy Match</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #ffdde1, #ee9ca7);
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    .hud {
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      margin-bottom: 15px;
+    }
+
+    .hud h1 {
+      margin: 5px 0;
+      font-size: 28px;
+      color: #ff4e50;
+    }
+
+    .hud p {
+      font-size: 18px;
+      margin: 4px 0;
+    }
+
+    button {
+      background: #ff4e50;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background: #e63e40;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 50px);
+      grid-template-rows: repeat(8, 50px);
+      gap: 5px;
+      justify-content: center;
+      margin: auto;
+      max-width: 440px;
+    }
+
+    .candy {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.3s ease;
+    }
+
+    .candy.red    { background: linear-gradient(135deg, #ff4e50, #f9d423); }
+    .candy.blue   { background: linear-gradient(135deg, #24c6dc, #514a9d); }
+    .candy.green  { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+    .candy.yellow { background: linear-gradient(135deg, #f7971e, #ffd200); }
+    .candy.purple { background: linear-gradient(135deg, #654ea3, #eaafc8); }
+
+    .remove {
+      transform: scale(0);
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h1>🍬 Candy Match</h1>
+    <p>Score: <span id="score">0</span></p>
+    <p>Moves: <span id="moves">30</span></p>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+
+  <div id="board"></div>
+
+  <audio id="popSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" preload="auto"></audio>
+
+  <script>
+    const rows = 8, cols = 8;
+    const colors = ["red", "blue", "green", "yellow", "purple"];
+    let board = [];
+    let score = 0, moves = 30;
+    const boardEl = document.getElementById("board");
+    const scoreEl = document.getElementById("score");
+    const movesEl = document.getElementById("moves");
+    const popSound = document.getElementById("popSound");
+
+    // Initialize board
+    function initBoard() {
+      board = [];
+      boardEl.innerHTML = "";
+      for (let r = 0; r < rows; r++) {
+        let row = [];
+        for (let c = 0; c < cols; c++) {
+          let color = colors[Math.floor(Math.random() * colors.length)];
+          let candy = createCandy(r, c, color);
+          row.push(candy);
+          boardEl.appendChild(candy);
+        }
+        board.push(row);
+      }
+    }
+
+    function createCandy(r, c, color) {
+      let div = document.createElement("div");
+      div.className = "candy " + color;
+      div.dataset.row = r;
+      div.dataset.col = c;
+      div.dataset.color = color;
+      return div;
+    }
+
+    // Swap candies
+    let firstCandy = null;
+    boardEl.addEventListener("click", e => {
+      if (!e.target.classList.contains("candy")) return;
+      let candy = e.target;
+
+      if (!firstCandy) {
+        firstCandy = candy;
+        candy.style.outline = "3px solid white";
+      } else {
+        swap(firstCandy, candy);
+        firstCandy.style.outline = "none";
+        firstCandy = null;
+      }
+    });
+
+    function swap(c1, c2) {
+      let r1 = +c1.dataset.row, c1col = +c1.dataset.col;
+      let r2 = +c2.dataset.row, c2col = +c2.dataset.col;
+      if (Math.abs(r1 - r2) + Math.abs(c1col - c2col) !== 1) return; // must be adjacent
+
+      [board[r1][c1col].dataset.color, board[r2][c2col].dataset.color] = 
+        [board[r2][c2col].dataset.color, board[r1][c1col].dataset.color];
+
+      renderBoard();
+      checkMatches();
+      moves--;
+      movesEl.textContent = moves;
+      if (moves <= 0) alert("Game Over! Final Score: " + score);
+    }
+
+    // Render board
+    function renderBoard() {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let candy = board[r][c];
+          candy.className = "candy " + candy.dataset.color;
+        }
+      }
+    }
+
+    // Check for matches
+    function checkMatches() {
+      let matched = [];
+      // Horizontal
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols - 2; c++) {
+          let color = board[r][c].dataset.color;
+          if (color &&
+              board[r][c+1].dataset.color === color &&
+              board[r][c+2].dataset.color === color) {
+            matched.push(board[r][c], board[r][c+1], board[r][c+2]);
+          }
+        }
+      }
+      // Vertical
+      for (let r = 0; r < rows - 2; r++) {
+        for (let c = 0; c < cols; c++) {
+          let color = board[r][c].dataset.color;
+          if (color &&
+              board[r+1][c].dataset.color === color &&
+              board[r+2][c].dataset.color === color) {
+            matched.push(board[r][c], board[r+1][c], board[r+2][c]);
+          }
+        }
+      }
+      if (matched.length > 0) {
+        matched.forEach(candy => {
+          candy.classList.add("remove");
+          setTimeout(() => {
+            candy.dataset.color = colors[Math.floor(Math.random() * colors.length)];
+            candy.classList.remove("remove");
+            renderBoard();
+          }, 300);
+        });
+        score += matched.length * 10;
+        scoreEl.textContent = score;
+        popSound.play();
+        setTimeout(checkMatches, 400); // keep checking after refill
+      }
+    }
+
+    function restartGame() {
+      score = 0;
+      moves = 30;
+      scoreEl.textContent = score;
+      movesEl.textContent = moves;
+      initBoard();
+    }
+
+    // Start game
+    initBoard();
+    checkMatches();
+  </script>
+</body>
+</html>

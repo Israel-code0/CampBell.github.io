@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Endless Runner</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: linear-gradient(to top, #444, #111);
+      touch-action: none;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+    }
+    #restartBtn {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background: #f00;
+      color: white;
+      cursor: pointer;
+    }
+    #instruction {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+    <div id="instruction">
+    <p>Swipe to jump</p>
+    </div>
+<div id="ui">
+  <div id="score">Score: 0</div>
+  <button id="restartBtn">Restart</button>
+   <button onclick="location.href='index.html'">🏠 Home</button>
+</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth < 600 ? window.innerWidth : 600;
+canvas.height = 400;
+
+let gameRunning = true;
+let score = 0;
+let speed = 5;
+
+// --- Sounds ---
+const jumpSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+const crashSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+
+// --- Player ---
+let player = {
+  x: 50,
+  y: canvas.height - 80,
+  width: 40,
+  height: 60,
+  dy: 0,
+  gravity: 0.8,
+  jumpPower: -12,
+  grounded: true,
+  sliding: false
+};
+
+// --- Obstacles ---
+let obstacles = [];
+
+// --- Restart Button ---
+const restartBtn = document.getElementById("restartBtn");
+restartBtn.addEventListener("click", restartGame);
+
+// --- Jump ---
+function jump() {
+  if (player.grounded && !player.sliding) {
+    player.dy = player.jumpPower;
+    player.grounded = false;
+    jumpSound.play();
+  }
+}
+
+// --- Slide ---
+function slide() {
+  if (player.grounded && !player.sliding) {
+    player.sliding = true;
+    player.height = 30;
+    setTimeout(() => {
+      player.sliding = false;
+      player.height = 60;
+    }, 800);
+  }
+}
+
+// --- Spawn Obstacles ---
+function spawnObstacle() {
+  let height = Math.random() > 0.5 ? 40 : 60;
+  obstacles.push({
+    x: canvas.width,
+    y: canvas.height - height,
+    width: 30,
+    height: height
+  });
+}
+setInterval(() => {
+  if (gameRunning) spawnObstacle();
+}, 2000);
+
+// --- Update ---
+function update() {
+  if (!gameRunning) return;
+
+  // Player physics
+  player.y += player.dy;
+  player.dy += player.gravity;
+  if (player.y + player.height >= canvas.height - 20) {
+    player.y = canvas.height - player.height - 20;
+    player.dy = 0;
+    player.grounded = true;
+  }
+
+  // Move obstacles
+  for (let obs of obstacles) {
+    obs.x -= speed;
+  }
+  obstacles = obstacles.filter(obs => obs.x + obs.width > 0);
+
+  // Collision detection
+  for (let obs of obstacles) {
+    if (
+      player.x < obs.x + obs.width &&
+      player.x + player.width > obs.x &&
+      player.y < obs.y + obs.height &&
+      player.y + player.height > obs.y
+    ) {
+      crashSound.play();
+      gameOver();
+    }
+  }
+
+  // Score
+  score++;
+  document.getElementById("score").innerText = "Score: " + score;
+}
+
+// --- Draw ---
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Ground
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+  // Player
+  ctx.fillStyle = "#0f0";
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Obstacles
+  ctx.fillStyle = "#f00";
+  for (let obs of obstacles) {
+    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+  }
+}
+
+// --- Loop ---
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+gameLoop();
+
+// --- Game Over ---
+function gameOver() {
+  gameRunning = false;
+  restartBtn.style.display = "block";
+}
+
+// --- Restart ---
+function restartGame() {
+  score = 0;
+  obstacles = [];
+  gameRunning = true;
+  restartBtn.style.display = "none";
+}
+
+// --- Controls ---
+// Keyboard
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" || e.code === "ArrowUp") jump();
+  if (e.code === "ArrowDown") slide();
+});
+
+// Touch (swipe)
+let startY = null;
+canvas.addEventListener("touchstart", e => {
+  startY = e.touches[0].clientY;
+});
+canvas.addEventListener("touchend", e => {
+  let endY = e.changedTouches[0].clientY;
+  if (startY - endY > 50) jump(); // Swipe up
+  if (endY - startY > 50) slide(); // Swipe down
+});
+</script>
+</body>
+</html>
